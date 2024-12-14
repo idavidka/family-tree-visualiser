@@ -1,0 +1,9 @@
+{
+    "recommendations": [
+        "dbaeumer.vscode-eslint",
+        "naumovs.color-highlight",
+        "eamodio.gitlens",
+        "firsttris.vscode-jest-runner",
+        "florianguitton.vscode-gedcom"
+    ]
+}

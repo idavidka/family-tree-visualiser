@@ -1,0 +1,11 @@
+// https://firebase.google.com/docs/web/learn-more?#config-object
+
+export const config = {
+	apiKey: "",
+	authDomain: "",
+	projectId: "",
+	storageBucket: "",
+	messagingSenderId: "",
+	appId: "",
+	measurementId: "",
+};
