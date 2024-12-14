@@ -139,7 +139,7 @@ export const Settings = ({ settings, isAncestry, isMyHeritage }: Props) => {
 
 			e.preventDefault();
 		},
-		[focusLast, localSettings, setNewSettings]
+		[localSettings, setNewSettings]
 	);
 
 	const doImport = useCallback(() => {
@@ -156,6 +156,7 @@ export const Settings = ({ settings, isAncestry, isMyHeritage }: Props) => {
 		<>
 			<Label className="text-white text-left text-xs mt-2">
 				<button
+					type="button"
 					className="underline text-white cursor-pointer"
 					onClick={doImport}
 				>
@@ -163,6 +164,7 @@ export const Settings = ({ settings, isAncestry, isMyHeritage }: Props) => {
 				</button>{" "}
 				/{" "}
 				<button
+					type="button"
 					className="underline text-white cursor-pointer"
 					onClick={doExport}
 				>
@@ -433,6 +435,21 @@ export const Settings = ({ settings, isAncestry, isMyHeritage }: Props) => {
 					"Below settings are applied only after a tree generation or adding individual manually."
 				)}
 			</Label>
+
+			<Toggle
+				label={t(
+					"Draw compact (moving siblings without child close to each other)"
+				)}
+				checked={localSettings.allowCompact}
+				onChange={(e) => {
+					setNewSettings({
+						...localSettings,
+						allowCompact: e.target.checked,
+					});
+				}}
+				className="text-white"
+				required
+			/>
 
 			<Toggle
 				label={t("Draw descendants")}

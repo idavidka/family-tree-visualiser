@@ -41,7 +41,9 @@
     "Gender colors": "Nemi színek",
     "Generate genealogy": "Teljes fa létrehozás",
     "Generate tree": "Egyenesági fa létrehozás",
-    "Get me in": "Belépés",
+    "Login": "Belépés",
+    "Login or registration": "Belépés vagy regisztráció",
+    "Forgot password": "Elfelejtett jelszó",
     "Given name, Surname": "Keresztnév, Vezetéknév",
     "Givenname": "Keresztnév",
     "Help": "Segítség",
@@ -206,5 +208,11 @@
     "Stop": "Megállítás",
     "Reverse": "Fordítás",
     "Overlapped individuals": "Átfedésben lévők",
-    "In the depicted family tree, there are a few individuals who cannot be placed in the correct positions using graph theory. This may be due to generational shifts, ancestral loss, or possibly branches merging in the case of closer relatives. The program attempts to draw the family tree in the most ideal way possible, but due to the unique characteristics of each family tree, this may be impossible in certain cases. The following individuals overlap with each other; please manually move them to the appropriate positions:": "Az ábrázolt családfában szerepel pár személy, akiket gráfelmélettel nem lehet korrekt pozícióba helyezni. Ennek oke lehet generációs eltolódás, ősvesztés, esetleg ágak összeérése közelebbi rokonok esetén. A program megpróbálja a lehető legideálisabban felrajzolni a családfát, de minden családfa sajátosságai miatt ez bizonyos esetekben lehetetlen. Az alábbi személyek csúsznak egymásra, kérlek, ezekel kézzel mozgasd számodra megfelelő pozícióba: "
+    "In the depicted family tree, there are a few individuals who cannot be placed in the correct positions using graph theory. This may be due to generational shifts, ancestral loss, or possibly branches merging in the case of closer relatives. The program attempts to draw the family tree in the most ideal way possible, but due to the unique characteristics of each family tree, this may be impossible in certain cases. The following individuals overlap with each other; please manually move them to the appropriate positions:": "Az ábrázolt családfában szerepel pár személy, akiket gráfelmélettel nem lehet korrekt pozícióba helyezni. Ennek oke lehet generációs eltolódás, ősvesztés, esetleg ágak összeérése közelebbi rokonok esetén. A program megpróbálja a lehető legideálisabban felrajzolni a családfát, de minden családfa sajátosságai miatt ez bizonyos esetekben lehetetlen. Az alábbi személyek csúsznak egymásra, kérlek, ezeket kézzel mozgasd számodra megfelelő pozícióba: ",
+    "Draw compact (moving siblings without child close to each other)": "Kompakt rajzolás (gyermektelen Testvérek egymás mellé kerülnek)",
+    "Unknown error, please try again later": "Ismeretlen hiba, kérlek, próbálkozz később",
+    "auth/invalid-login-credentials": "Nem megfelelő e-mail és jelszó páros",
+    "auth/missing-email": "Hiányzó e-mail",
+    "auth/missing-email-or-password": "Hiányzó e-mail vagy jelszó",
+    "auth/reset-email-sent": "Visszaállító e-mail elküldve"
 }

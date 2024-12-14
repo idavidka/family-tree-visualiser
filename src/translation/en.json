@@ -24,5 +24,9 @@
     "_MILT": "Military",
     "RELI": "Religion",
     "IMMI": "Immigration",
-    "AKA": "Also known as"
+    "AKA": "Also known as",
+    "auth/invalid-login-credentials": "Invalid credentials",
+    "auth/missing-email": "Missing e-mail",
+    "auth/missing-email-or-password": "Missing e-mail or password",
+    "auth/reset-email-sent": "Reset e-mail sent"
 }

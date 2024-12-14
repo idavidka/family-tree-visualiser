@@ -11,6 +11,7 @@ import {
 	type Settings,
 	type TreeType,
 	DEFAULT_TREE_STATE,
+	type TreeState,
 } from "./reducers";
 import { type IndiKey } from "../../types/types";
 import { type Position, type Size } from "../../types/graphic-types";
@@ -33,29 +34,60 @@ import { startPositionFixer } from "../../utils/tree/position-fixer";
 import { setGenealogyUtil } from "../../utils/tree/set-genealogy";
 import saveAs from "file-saver";
 import { format } from "date-fns";
+import { omit } from "lodash";
 
 export type R<T> = CaseReducer<State, PayloadAction<T>>;
 export type RN = CaseReducer<State>;
 
-export const rehydrate: R<State> = (state, action) => {
-	if (!value(state, "settings").cloudSync) {
-		return;
-	}
-
-	const newState: State = {
-		...state,
-		...action.payload,
-		loading: state.loading,
-	};
-
-	Object.entries(newState.treeState).forEach(([id, treeState]) => {
-		if (treeState.type !== "manual") {
-			treeState.stage = {
-				...state.treeState[id]?.stage,
-			};
+export const rehydrate: R<
+	Partial<
+		State & {
+			callback?: (
+				stage: TreeState["stage"],
+				fanStage: TreeState["stage"]
+			) => void;
 		}
-		treeState.raw = treeState.raw || state.treeState[id]?.raw;
-	});
+	>
+> = (state, action) => {
+	// if (!value(state, "settings").cloudSync) {
+	// 	return;
+	// }
+
+	const newState: State = JSON.parse(
+		JSON.stringify({
+			...state,
+			...omit(action.payload, "treeState", "callback"),
+			loading: state.loading,
+		})
+	);
+
+	Object.entries(action.payload.treeState ?? {}).forEach(
+		([key, treeState]) => {
+			const id = key === "default" ? "" : key;
+			if (!state.treeState[id]?.settings.cloudSync && id) {
+				return;
+			}
+
+			newState.treeState[id] = {
+				...treeState,
+				stage: state.treeState[id]?.stage,
+				raw: treeState.raw || state.treeState[id]?.raw,
+			};
+			// if (treeState.type !== "manual") {
+			// 	state.treeState[id].stage = {
+			// 		...state.treeState[id]?.stage,
+			// 	};
+			// }
+			// treeState.raw = treeState.raw || state.treeState[id]?.raw;
+		}
+	);
+
+	// newState.treeState[""] = newState.treeState.default ?? DEFAULT_TREE_STATE;
+	// delete newState.treeState.default;
+
+	const appliedStage = value(newState, "stage");
+	const appliedFanStage = value(newState, "stage");
+	action.payload.callback?.(appliedStage, appliedFanStage);
 
 	return newState;
 };
@@ -63,15 +95,23 @@ export const rehydrate: R<State> = (state, action) => {
 export const rehydrateRaw: R<
 	Pick<State, "rawSnapshotId"> & { treeState?: Record<string, string> }
 > = (state, action) => {
-	if (!value(state, "settings").cloudSync) {
-		return;
+	// if (!value(state, "settings").cloudSync) {
+	// 	return;
+	// }
+
+	if (action.payload.rawSnapshotId) {
+		state.rawSnapshotId = action.payload.rawSnapshotId;
 	}
 
 	Object.entries(action.payload.treeState ?? {}).forEach(
-		([id, treeState]) => {
+		([key, treeState]) => {
+			const id = key === "default" ? "" : key;
+			if (!state.treeState[id]?.settings.cloudSync && id) {
+				return;
+			}
+
 			if (state.treeState[id] && treeState !== state.treeState[id].raw) {
 				state.treeState[id].raw = treeState;
-				state.rawSnapshotId = action.payload.rawSnapshotId;
 				treeState && resetGedcomCache(id, GedcomTree.parse(treeState));
 			}
 		}
@@ -136,6 +176,7 @@ export const resetSettings: RN = (state) => {
 };
 
 export const setSettings: R<Partial<Settings>> = (state, action) => {
+	const currentCloudSync = value(state, "settings").cloudSync;
 	value(state, "settings", {
 		...DEFAULT_TREE_STATE.settings,
 		...value(state, "settings"),
@@ -143,6 +184,10 @@ export const setSettings: R<Partial<Settings>> = (state, action) => {
 	});
 
 	saveState(state);
+
+	if (currentCloudSync !== action.payload.cloudSync) {
+		saveRawState(state);
+	}
 };
 
 export const setAdditionalSettings: R<{

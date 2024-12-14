@@ -122,6 +122,7 @@ export interface Settings {
 	genderColors: GenderColor;
 	cornerRounding: number;
 	drawDescendants: boolean;
+	allowCompact: boolean;
 
 	// fan
 	familyColors: Color[];
@@ -207,6 +208,7 @@ export const DEFAULT_TREE_STATE: TreeState = {
 			w: WIDTH,
 			h: HEIGHT,
 		},
+		allowCompact: true,
 		maxGivennames: 0,
 		maxSurnames: 0,
 		horizontalSpace: HORIZONTAL_MARGIN_MULTIPLIER,

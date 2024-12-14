@@ -239,6 +239,7 @@ const Header = ({
 						/>
 					)}
 					<button
+						type="button"
 						// eslint-disable-next-line max-len
 						className="underline text-gray-800 dark:text-gray-50 hover:text-blue-500 cursor-pointer self-end"
 						onClick={() => {

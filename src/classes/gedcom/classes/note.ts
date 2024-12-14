@@ -1,10 +1,8 @@
-import { format, isValid, parseISO } from "date-fns";
 import { Common, createCommon } from "./common";
 import { type GedComType } from "./gedcom";
 import { List } from "./list";
-import { type IdType } from "../../../types/types";
 
-const LONG_NOTES = {
+const _LONG_NOTES = {
 	"Abt.": "About",
 	"Bef.": "Before",
 	"Aft.": "After",

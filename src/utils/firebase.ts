@@ -17,13 +17,14 @@ import {
 	createUserWithEmailAndPassword,
 	getAuth,
 	signInWithEmailAndPassword,
+	sendPasswordResetEmail,
 } from "firebase/auth";
 import { config } from "../configs/firebase.config";
 import { type State } from "../store/main/reducers";
 import omit from "lodash/omit";
 import pick from "lodash/pick";
 import { type DebugState } from "../store/debug/reducers";
-import { throttle } from "lodash";
+import { debounce } from "lodash";
 
 type SnapshotState<S> = S & { lastActionTime: number };
 
@@ -120,6 +121,10 @@ export const deleteStates = (docObj: State, callback?: () => void) => {
 	}
 };
 
+const setThrottledDoc = debounce((...args: Parameters<typeof setDoc>) => {
+	setDoc(...args);
+}, 3000);
+
 export const saveState = (docObj: State) => {
 	if (!docObj.snapshotId) {
 		return;
@@ -127,9 +132,13 @@ export const saveState = (docObj: State) => {
 
 	const obj = JSON.parse(JSON.stringify(docObj)) as State;
 	Object.entries(obj.treeState).forEach(([id, treeState]) => {
-		if (!treeState.settings.cloudSync) {
+		if (!treeState.settings.cloudSync && id) {
 			delete obj.treeState[id];
 			return;
+		}
+		if (id === "") {
+			obj.treeState.default = obj.treeState[id];
+			delete obj.treeState[id];
 		}
 		if (treeState.type !== "manual") {
 			treeState.stage.lines = {};
@@ -140,16 +149,19 @@ export const saveState = (docObj: State) => {
 	const compressed = compress(obj) as State;
 	const objWithoutRaw = omit(compressed, "loading", "loadingTime");
 	const { userId } = objWithoutRaw;
-	throttle(() => {
-		if (userId) {
-			setDoc(doc(db, "state", userId), {
+
+	if (userId) {
+		setThrottledDoc(
+			doc(db, "state", userId),
+			{
 				...objWithoutRaw,
 				lastActionTime: Date.now(),
-			});
-		} else {
-			console.error("Id must be provided");
-		}
-	}, 5000);
+			},
+			{}
+		);
+	} else {
+		console.error("Id must be provided");
+	}
 };
 
 export const deleteRawStates = (docObj: State, callback?: () => void) => {
@@ -186,20 +198,23 @@ export const saveRawState = (docObj: State) => {
 		if (userId) {
 			const newRaws: Record<string, string | undefined> = {};
 			Object.entries(rawObj.treeState).forEach(([id, treeState]) => {
-				if (!treeState.settings.cloudSync) {
+				if (!treeState.settings.cloudSync && id) {
 					return;
 				}
 				newRaws[id] = treeState.raw;
 			});
 			const raws = chunkRaw(JSON.stringify(newRaws));
+
 			raws?.forEach((raw, index) => {
-				setDoc(doc(db, "raw", `${userId}_${index}`), {
-					...omit(rawObj, "treeState"),
-					index,
-					total: raws.length,
-					raw,
-					lastActionTime: Date.now(),
-				});
+				setTimeout(() => {
+					setDoc(doc(db, "raw", `${userId}_${index}`), {
+						...omit(rawObj, "treeState"),
+						index,
+						total: raws.length,
+						raw,
+						lastActionTime: Date.now(),
+					});
+				}, 1000 * index);
 			});
 		} else {
 			console.error("Id must be provided");
@@ -245,9 +260,24 @@ export const saveDebugState = (docObj: DebugState) => {
 
 export interface AuthState {
 	user?: UserCredential["user"];
+	successCode?: string;
 	errorCode?: string;
 	errorMessage?: string;
 }
+
+export const doResetPassword = async (email: string) => {
+	const authState: AuthState = {};
+	await sendPasswordResetEmail(auth, email)
+		.then(() => {
+			authState.successCode = "auth/reset-email-sent";
+		})
+		.catch((error) => {
+			authState.errorCode = error.code;
+			authState.errorMessage = error.message;
+		});
+
+	return authState;
+};
 
 export const doAuth = async (email: string, password: string) => {
 	const authState: AuthState = {};
@@ -289,6 +319,7 @@ export const subscribe = <S>(
 		snapshot.forEach((docData) => {
 			data.push(docData.data() as SnapshotState<S>);
 		});
+
 		onChanged(data);
 	});
 	return unsubscribe;

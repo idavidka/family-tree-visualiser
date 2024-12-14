@@ -21,11 +21,10 @@ import {
 } from "./position";
 import { Individuals } from "../../classes/gedcom/classes/indis";
 
-const ALLOW_COMPACT = false;
-
 type AvoidTouching = Record<IndiKey, "main" | "spouse" | undefined>;
 
 interface AddGenerationProps {
+	allowCompact?: boolean;
 	childrenOnlyFor?: IndiType;
 	gen: number;
 	generation: IndiType[];
@@ -56,6 +55,7 @@ interface AddGenerationProps {
 }
 
 const addGenerationWithDescendantsToStage = ({
+	allowCompact,
 	childrenOnlyFor,
 	gen,
 	generation,
@@ -367,7 +367,7 @@ const addGenerationWithDescendantsToStage = ({
 					}
 					if (!children?.length) {
 						if (
-							ALLOW_COMPACT && // Move person with no children close to the previous person
+							allowCompact && // Move person with no children close to the previous person
 							!childrenInAvoided.length &&
 							forRemoval &&
 							forRemovalGen === gen &&
@@ -430,6 +430,7 @@ const addGenerationWithDescendantsToStage = ({
 
 						const { genX, stageIndis, stagesByGen } =
 							addGenerationWithDescendantsToStage({
+								allowCompact,
 								gen: gen - 1,
 								generation: children,
 								nextX: nextGenX,
@@ -534,6 +535,7 @@ export const setTreeUtil = <T extends boolean, U extends boolean>(
 		: { yCoordinates: Record<number, number>; indis: DimensionsByGen }
 	: { yCoordinates: Record<number, number>; indis: DimensionsByGen } => {
 	const gedcom = typeof raw === "string" ? GedcomTree.parse(raw) : raw;
+	const allowCompact = settings.allowCompact;
 
 	const diff = settings.individualSize.w * settings.horizontalSpace;
 	const indi = gedcom?.indi(id);
@@ -739,6 +741,7 @@ export const setTreeUtil = <T extends boolean, U extends boolean>(
 	});
 
 	const { stageIndis, stagesByGen } = addGenerationWithDescendantsToStage({
+		allowCompact,
 		childrenOnlyFor: !forGenealogy ? indi : undefined,
 		gen: 0,
 		generation: mainGeneration,
@@ -849,6 +852,7 @@ export const setTreeUtil = <T extends boolean, U extends boolean>(
 
 						const { stagesByGen } =
 							addGenerationWithDescendantsToStage({
+								allowCompact,
 								gen: genNum,
 								generation: [indi],
 								nextX:
