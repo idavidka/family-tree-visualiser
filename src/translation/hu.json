@@ -214,5 +214,6 @@
     "auth/invalid-login-credentials": "Nem megfelelő e-mail és jelszó páros",
     "auth/missing-email": "Hiányzó e-mail",
     "auth/missing-email-or-password": "Hiányzó e-mail vagy jelszó",
-    "auth/reset-email-sent": "Visszaállító e-mail elküldve"
+    "auth/reset-email-sent": "Visszaállító e-mail elküldve",
+    "Syncing with cloud": "Szinkronizálás a felhővel"
 }

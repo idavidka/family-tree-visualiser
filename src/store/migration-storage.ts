@@ -5,16 +5,19 @@ export default class MigrationStorage implements WebStorage {
 	private hasDb?: boolean;
 	private readonly from: WebStorage;
 	private readonly to: WebStorage;
-	private readonly checker: () => Promise<boolean>;
+	private readonly fromChecker: () => Promise<boolean>;
+	private readonly toChecker: () => Promise<boolean>;
 
 	constructor(
 		from: WebStorage,
 		to: WebStorage,
-		checker: () => Promise<boolean>
+		fromChecker: () => Promise<boolean>,
+		toChecker: () => Promise<boolean>
 	) {
 		this.from = from;
 		this.to = to;
-		this.checker = checker;
+		this.fromChecker = fromChecker;
+		this.toChecker = toChecker;
 
 		this.hasIndexedDb();
 	}
@@ -25,11 +28,16 @@ export default class MigrationStorage implements WebStorage {
 			return this.hasDb;
 		}
 
-		const current = await this.checker();
+		const currentFrom = await this.fromChecker();
+		const currentTo = !currentFrom || (await this.toChecker());
 
-		console.log("[Migration][current db state]", !!current);
+		console.log(
+			"[Migration][current db state]",
+			!!currentFrom,
+			!!currentTo
+		);
 
-		this.hasDb = !!current;
+		this.hasDb = !!currentTo;
 
 		return this.hasDb;
 	}

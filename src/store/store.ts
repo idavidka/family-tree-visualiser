@@ -38,6 +38,11 @@ export const mainPersistConfig: PersistConfig<MainState> = {
 					storeName: "state",
 				}),
 				async () => {
+					const current = localStorage.getItem("persist:ftv-main");
+
+					return await Promise.resolve(!!current);
+				},
+				async () => {
 					const instance = getMigrationInstance();
 
 					const current = await instance.getItem("persist:ftv-main");
@@ -46,11 +51,11 @@ export const mainPersistConfig: PersistConfig<MainState> = {
 				}
 		  ),
 	blacklist: [
+		"clouding",
 		"loading",
 		"loadingTime",
 		"snapshotId",
 		"rawSnapshotId",
-		"loading",
 	],
 };
 
@@ -66,10 +71,12 @@ const rootReducer = combineReducers({
 	debug: persistReducer(debugPersistConfig, debugReducer),
 });
 
-export default configureStore({
+const store = configureStore({
 	reducer: rootReducer,
 	middleware: (getDefaultMiddleware) =>
 		getDefaultMiddleware({
 			serializableCheck: false,
 		}),
 });
+
+export default store;

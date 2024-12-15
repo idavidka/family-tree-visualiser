@@ -10,7 +10,7 @@ import { changeTheme, DARK_THEME, LIGHT_THEME } from "./theme";
 import { Layout } from "./components/layout/layout.styled";
 import Sidebar from "./components/sidebar/sidebar";
 import Stage from "./components/stage/stage";
-import { decompress, getToken, subscribe } from "./utils/firebase";
+import { decompress, getToken, parseChunks, subscribe } from "./utils/firebase";
 import { useDispatch, useSelector } from "react-redux";
 import {
 	selectUserId,
@@ -25,8 +25,9 @@ import {
 	selectLoadingText,
 	selectRawSnapshotId,
 	selectAllIndis,
+	selectClouding,
 } from "./store/main/selectors";
-import { limit, where } from "firebase/firestore";
+import { where } from "firebase/firestore";
 import Login from "./components/login/login";
 import { type State, actions } from "./store/main/reducers";
 import { v4 as uuid } from "uuid";
@@ -45,7 +46,6 @@ import {
 	type DebugState,
 	actions as debugActions,
 } from "./store/debug/reducers";
-import { value } from "./store/main/utils";
 import { FAKE_USER } from "./constants/constants";
 import { copyTextToClipboard } from "./utils/copy";
 import Individual from "./components/individual/individual";
@@ -72,6 +72,7 @@ const App = (): JSX.Element => {
 	const snapshotId = useSelector(selectSnapshotId);
 	const rawSnapshotId = useSelector(selectRawSnapshotId);
 	const loading = useSelector(selectLoading);
+	const clouding = useSelector(selectClouding);
 	const loadingTime = useSelector(selectLoadingTime);
 	const loadingText = useSelector(selectLoadingText);
 	const guided = useSelector(selectGuided);
@@ -235,49 +236,91 @@ const App = (): JSX.Element => {
 			return;
 		}
 
-		const subMain = () =>
-			subscribe<State>(
-				"state",
+		const subMain = () => {
+			const states: Record<number, string> = {};
+
+			let rehydrateTimer: NodeJS.Timeout | undefined;
+			return subscribe<State>(
+				"state_chunks",
 				(state) => {
+					const allIndexedState = state as Array<
+						State & {
+							chunk?: string;
+							index: number;
+							total: number;
+							lastActionTime: number;
+						}
+					>;
+					const indexedState = allIndexedState.filter(
+						(indexState) => {
+							return (
+								allIndexedState[0].lastActionTime ===
+								indexState.lastActionTime
+							);
+						}
+					);
+					indexedState.forEach((data) => {
+						states[data.index] = data.chunk || "";
+					});
+
 					if (
-						!snapshotIdRef.current ||
-						state[0]?.snapshotId !== snapshotIdRef.current
+						Object.keys(states).length ===
+							(indexedState[0]?.total ?? 0) &&
+						(!snapshotIdRef.current ||
+							indexedState[0]?.snapshotId !==
+								snapshotIdRef.current)
 					) {
-						if (state[0]) {
-							const newState = decompress(state[0]);
+						if (indexedState[0]) {
+							const joinedRaw = parseChunks<State>(states);
+							const newState = decompress(joinedRaw);
+							clearTimeout(rehydrateTimer);
 							dispatch(
-								actions.rehydrate({
-									...newState,
-									snapshotId: uuid(),
-									callback: (
-										appliedStage,
-										appliedFanStage
-									) => {
-										transformRef.current?.setTransform(
-											appliedStage.x,
-											appliedStage.y,
-											appliedStage.scale
-										);
-										transformFanRef.current?.setTransform(
-											appliedFanStage.x,
-											appliedFanStage.y,
-											appliedFanStage.scale
-										);
-									},
+								actions.setClouding({
+									state: true,
+									fullscreen: true,
 								})
 							);
-							window.isRehydrating = true;
+							rehydrateTimer = setTimeout(() => {
+								dispatch(
+									actions.rehydrate({
+										...newState,
+										snapshotId: uuid(),
+										callback: (
+											appliedStage,
+											appliedFanStage
+										) => {
+											window.isRehydrating = true;
+											appliedStage &&
+												transformRef.current?.setTransform(
+													appliedStage.x,
+													appliedStage.y,
+													appliedStage.scale
+												);
+											appliedFanStage &&
+												transformFanRef.current?.setTransform(
+													appliedFanStage.x,
+													appliedFanStage.y,
+													appliedFanStage.scale
+												);
+										},
+									})
+								);
+							}, 500);
 						} else {
 							dispatch(
-								actions.rehydrate({
-									snapshotId: uuid(),
-								})
+								actions.rehydrate(
+									decompress({
+										snapshotId: uuid(),
+									})
+								)
 							);
 						}
 					}
 				},
-				[where("userId", "==", userId), limit(1)]
+				[where("userId", "==", userId)]
 			);
+		};
+
 		const unsubscribeMain = subMain();
 
 		const subRaw = () => {
@@ -287,25 +330,35 @@ const App = (): JSX.Element => {
 			return subscribe<State>(
 				"raw",
 				(state) => {
-					const indexedState = state as Array<
+					const allIndexedState = state as Array<
 						State & {
-							name?: string;
 							raw?: string;
 							index: number;
 							total: number;
+							lastActionTime: number;
 						}
 					>;
+					const indexedState = allIndexedState.filter(
+						(indexState) => {
+							return (
+								allIndexedState[0].lastActionTime ===
+								indexState.lastActionTime
+							);
+						}
+					);
 					indexedState.forEach((data) => {
 						states[data.index] = data.raw || "";
 					});
 					if (
 						Object.keys(states).length ===
-						(indexedState[0]?.total ?? 0)
+							(indexedState[0]?.total ?? 0) &&
+						(!rawSnapshotIdRef.current ||
+							indexedState[0]?.rawSnapshotId !==
+								rawSnapshotIdRef.current)
 					) {
 						if (indexedState[0]) {
-							const joinedRaw = JSON.parse(
-								Object.values(states).join("")
-							) as Record<string, string>;
+							const joinedRaw =
+								parseChunks<Record<string, string>>(states);
 
 							clearTimeout(rehydrateRawTimer);
 							rehydrateRawTimer = setTimeout(() => {
@@ -318,7 +371,7 @@ const App = (): JSX.Element => {
 										})
 									)
 								);
-							}, 1000);
+							}, 500);
 						} else {
 							dispatch(
 								actions.rehydrateRaw(
@@ -333,6 +386,7 @@ const App = (): JSX.Element => {
 				[where("userId", "==", userId)]
 			);
 		};
+
 		const unsubscribeRaw = subRaw();
 
 		const subDebug = () => {
@@ -442,9 +496,13 @@ const App = (): JSX.Element => {
 					)}
 				</Layout>
 				<Loading
-					visible={loading}
-					time={loadingTime}
-					text={loadingText}
+					visible={clouding === "fullscreen" || loading}
+					time={clouding === "fullscreen" ? undefined : loadingTime}
+					text={
+						clouding === "fullscreen"
+							? "Syncing with cloud"
+							: loadingText
+					}
 				/>
 			</ThemeProvider>
 		</TourProvider>

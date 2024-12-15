@@ -15,7 +15,7 @@ export const value = function <T extends keyof TreeState>(
 	newValue?: Draft<TreeState>[T]
 ) {
 	if (!state.treeState[state.selectedRaw]) {
-		state.treeState[state.selectedRaw] = defaultRaw(state);
+		state.treeState[state.selectedRaw] = { ...defaultRaw(state) };
 	}
 
 	if (arguments.length > 2) {
