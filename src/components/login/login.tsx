@@ -1,6 +1,11 @@
 // eslint-disable max-len
 import React, { type ChangeEvent, useCallback, useState } from "react";
-import { type AuthState, doAuth, createAuth } from "../../utils/firebase";
+import {
+	type AuthState,
+	doAuth,
+	createAuth,
+	doResetPassword,
+} from "../../utils/firebase";
 import { useDispatch } from "react-redux";
 import { actions } from "../../store/main/reducers";
 import { Button } from "../button/button.styled";
@@ -16,7 +21,7 @@ export default function Login() {
 		email: string;
 		password: string;
 	}>({ email: "", password: "" });
-	const [authState, setAuthState] = useState<AuthState>();
+	const [authState, setAuthState] = useState<AuthState | undefined>();
 
 	const { language, setLanguage, t } = useLocale();
 
@@ -25,12 +30,30 @@ export default function Login() {
 			...prev,
 			[e.target.id]: e.target.value,
 		}));
+		setAuthState(undefined);
 	}, []);
 
-	const authenticate = useCallback(() => {
-		if (!loginState.email || !loginState.password) {
+	const resetPassword = useCallback(() => {
+		if (!loginState.email) {
+			setAuthState({ errorCode: "auth/missing-email" });
 			return;
 		}
+		setAuthState({});
+
+		doResetPassword(loginState.email).then((response) => {
+			if (response.errorCode || response.successCode) {
+				setAuthState(response);
+			} else {
+				setAuthState(undefined);
+			}
+		});
+	}, [loginState.email]);
+	const authenticate = useCallback(() => {
+		if (!loginState.email || !loginState.password) {
+			setAuthState({ errorCode: "auth/missing-email-or-password" });
+			return;
+		}
+		setAuthState({});
 
 		if (
 			isDevelopment() &&
@@ -40,8 +63,6 @@ export default function Login() {
 			dispatch(actions.setUserId(FAKE_USER.userId));
 			return;
 		}
-
-		setAuthState({});
 
 		doAuth(loginState.email, loginState.password).then((response) => {
 			if (response.errorCode === "auth/invalid-login-credentials") {
@@ -57,6 +78,7 @@ export default function Login() {
 			} else if (response.errorCode) {
 				setAuthState(response);
 			} else {
+				setAuthState(undefined);
 				dispatch(actions.setUserId(loginState.email));
 			}
 		});
@@ -70,6 +92,8 @@ export default function Login() {
 		},
 		[authenticate]
 	);
+
+	const hasError = authState && "errorCode" in authState;
 
 	return (
 		<>
@@ -124,7 +148,7 @@ export default function Login() {
 									{t("Password")}
 								</label>
 							</div>
-							<div className="mt-2">
+							<div className="mt-2 flex flex-col">
 								<input
 									id="password"
 									name="password"
@@ -136,12 +160,32 @@ export default function Login() {
 									// eslint-disable-next-line max-len
 									className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
 								/>
+
+								<button
+									type="button"
+									className="self-end underline text-xs text-gray-500 dark:text-gray-500 hover:text-blue-900 dark:hover:text-blue-900 cursor-pointer"
+									onClick={resetPassword}
+								>
+									{t("Forgot password")}
+								</button>
 							</div>
 						</div>
 
 						<div>
-							<div className="m-2 text-red-500 text-center">
-								{authState?.errorCode}
+							<div
+								className={`m-2 ${
+									!hasError
+										? "text-green-500"
+										: "text-red-500"
+								} text-center`}
+							>
+								{hasError
+									? t(
+											authState?.errorCode ??
+												"Unknown issue, please try again later"
+									  )
+									: authState?.successCode &&
+									  t(authState.successCode)}
 							</div>
 							<button
 								type="button"
@@ -152,7 +196,7 @@ export default function Login() {
 									!loginState.email || !loginState.password
 								}
 							>
-								{t("Get me in")}
+								{t("Login or registration")}
 							</button>
 
 							{/* eslint-disable-next-line max-len */}

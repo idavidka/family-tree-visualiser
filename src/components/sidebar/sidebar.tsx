@@ -1391,6 +1391,7 @@ const Sidebar = ({
 			t,
 			kinship?.long,
 			onKinshipReverse,
+			canPlay,
 			onKinshipAction,
 			onKinshipTravel,
 			travelStarted,
@@ -1472,6 +1473,7 @@ const Sidebar = ({
 					)}
 					{overlappedSelection.map((overlapped, overlappedIndex) => (
 						<button
+							type="button"
 							key={overlappedIndex}
 							className="inline-flex mr-1 underline text-gray-900 cursor-pointer"
 							onClick={(e) => {

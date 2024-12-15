@@ -2,8 +2,6 @@ import React, { type ReactNode } from "react";
 import { type IndiType } from "../../classes/gedcom/classes/indi";
 import { Date } from "./date.styled";
 import { dateFormatter, noteDateFormatter } from "../../utils/date-formatter";
-import { useSelector } from "react-redux";
-import { selectSettings } from "../../store/main/selectors";
 import { Container, Label, Row, Separator } from "./facts.styled";
 import { useTranslation } from "react-i18next";
 import { placeTranslator } from "../../utils/place-translator";

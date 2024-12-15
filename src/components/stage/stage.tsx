@@ -1321,6 +1321,7 @@ const Stage = ({
 	const preventHover = useRef(false);
 	const mouseMoving = useRef(false);
 	const mouseDown = useRef(false);
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	const onLineAction = useCallback<MouseEventHandler>(
 		debounce((event) => {
 			if (document.querySelector(".main-hovered")) {

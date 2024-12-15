@@ -32,6 +32,7 @@ export const Numeric = ({
 			<input
 				type="number"
 				id={id}
+				// eslint-disable-next-line max-len
 				className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full px-2.5 py-1"
 				placeholder=""
 				min={min}

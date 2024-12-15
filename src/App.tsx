@@ -240,30 +240,40 @@ const App = (): JSX.Element => {
 				"state",
 				(state) => {
 					if (
-						(!snapshotIdRef.current ||
-							state[0]?.snapshotId !== snapshotIdRef.current) &&
-						state[0]
+						!snapshotIdRef.current ||
+						state[0]?.snapshotId !== snapshotIdRef.current
 					) {
-						const newState = decompress(state[0]);
-						const newStage = value(newState, "stage");
-						const newFanStage = value(newState, "fanStage");
-						dispatch(
-							actions.rehydrate({
-								...newState,
-								snapshotId: uuid(),
-							})
-						);
-						window.isRehydrating = true;
-						transformRef.current?.setTransform(
-							newStage.x,
-							newStage.y,
-							newStage.scale
-						);
-						transformFanRef.current?.setTransform(
-							newFanStage.x,
-							newFanStage.y,
-							newFanStage.scale
-						);
+						if (state[0]) {
+							const newState = decompress(state[0]);
+							dispatch(
+								actions.rehydrate({
+									...newState,
+									snapshotId: uuid(),
+									callback: (
+										appliedStage,
+										appliedFanStage
+									) => {
+										transformRef.current?.setTransform(
+											appliedStage.x,
+											appliedStage.y,
+											appliedStage.scale
+										);
+										transformFanRef.current?.setTransform(
+											appliedFanStage.x,
+											appliedFanStage.y,
+											appliedFanStage.scale
+										);
+									},
+								})
+							);
+							window.isRehydrating = true;
+						} else {
+							dispatch(
+								actions.rehydrate({
+									snapshotId: uuid(),
+								})
+							);
+						}
 					}
 				},
 				[where("userId", "==", userId), limit(1)]
@@ -279,6 +289,7 @@ const App = (): JSX.Element => {
 				(state) => {
 					const indexedState = state as Array<
 						State & {
+							name?: string;
 							raw?: string;
 							index: number;
 							total: number;
@@ -288,25 +299,35 @@ const App = (): JSX.Element => {
 						states[data.index] = data.raw || "";
 					});
 					if (
-						Object.keys(states).length === indexedState[0]?.total &&
-						indexedState[0]
+						Object.keys(states).length ===
+						(indexedState[0]?.total ?? 0)
 					) {
-						const joinedRaw = JSON.parse(
-							Object.values(states).join("")
-						) as Record<string, string>;
+						if (indexedState[0]) {
+							const joinedRaw = JSON.parse(
+								Object.values(states).join("")
+							) as Record<string, string>;
 
-						clearTimeout(rehydrateRawTimer);
-						rehydrateRawTimer = setTimeout(() => {
+							clearTimeout(rehydrateRawTimer);
+							rehydrateRawTimer = setTimeout(() => {
+								dispatch(
+									actions.rehydrateRaw(
+										decompress({
+											...indexedState[0],
+											treeState: joinedRaw,
+											rawSnapshotId: uuid(),
+										})
+									)
+								);
+							}, 1000);
+						} else {
 							dispatch(
 								actions.rehydrateRaw(
 									decompress({
-										...indexedState[0],
-										treeState: joinedRaw,
 										rawSnapshotId: uuid(),
 									})
 								)
 							);
-						}, 1000);
+						}
 					}
 				},
 				[where("userId", "==", userId)]
