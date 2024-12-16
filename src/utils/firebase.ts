@@ -20,11 +20,12 @@ import {
 	sendPasswordResetEmail,
 } from "firebase/auth";
 import { config } from "../configs/firebase.config";
-import { type State } from "../store/main/reducers";
+import { actions, type State } from "../store/main/reducers";
 import omit from "lodash/omit";
 import pick from "lodash/pick";
 import { type DebugState } from "../store/debug/reducers";
 import { debounce } from "lodash";
+import { dynamicStore } from "../store/dynamic-store";
 
 type SnapshotState<S> = S & { lastActionTime: number };
 
@@ -69,6 +70,41 @@ const decompressMap = Object.entries(compressMap).reduce<
 	return acc;
 }, {});
 
+export const addChunkMarker = (
+	string: string,
+	total: number,
+	current: number,
+	id: string | number
+) => {
+	const isFirst = current === 0;
+	const isLast = current >= total - 1;
+
+	let markedString = `${isFirst ? "START" : "CHUNK"} ${id}>>>${string}`;
+
+	if (isLast) {
+		markedString = `${markedString}<<<${id} END`;
+	}
+
+	return markedString;
+};
+
+export const parseChunks = <T>(
+	chunks: Record<number, string> | string[]
+): T => {
+	const chunkString = Object.values(chunks).join("");
+
+	const chunkId = chunkString.match(/START\s(?<id>\d+)>>>/)?.groups?.id as
+		| string
+		| undefined;
+
+	const rawString = chunkString
+		.replace(new RegExp(`^.*START ${chunkId}>>>`), "")
+		.replace(new RegExp(`<<<${chunkId} END.*$`), "")
+		.replace(new RegExp(`CHUNK ${chunkId}>>>`), "");
+
+	return JSON.parse(rawString) as T;
+};
+
 const chunkRaw = (raw?: string, size = 900000) => {
 	const parts = [];
 	let last = raw ?? "";
@@ -102,10 +138,17 @@ export const decompress = <T extends object>(state: T) => {
 	return JSON.parse(newState) as T;
 };
 
-export const deleteStates = (docObj: State, callback?: () => void) => {
-	const { userId } = docObj;
+export const deleteStates = (
+	userId?: string,
+	callback?: () => void,
+	constraints?: QueryConstraint[]
+) => {
 	if (userId) {
-		const q = query(collection(db, "state"), where("userId", "==", userId));
+		const q = query(
+			collection(db, "state_chunks"),
+			where("userId", "==", userId),
+			...(constraints ?? [])
+		);
 
 		const unsubscribe = onSnapshot(q, (snapshot) => {
 			Promise.all(
@@ -121,12 +164,45 @@ export const deleteStates = (docObj: State, callback?: () => void) => {
 	}
 };
 
-const setThrottledDoc = debounce((...args: Parameters<typeof setDoc>) => {
+const _setThrottledDoc = debounce((...args: Parameters<typeof setDoc>) => {
 	setDoc(...args);
 }, 3000);
 
-export const saveState = (docObj: State) => {
-	if (!docObj.snapshotId) {
+const saveTimeouts: { main?: NodeJS.Timeout; sub: NodeJS.Timeout[] } = {
+	sub: [],
+};
+const saveRawTimeouts: { main?: NodeJS.Timeout; sub: NodeJS.Timeout[] } = {
+	sub: [],
+};
+const clearSaveTimeouts = (
+	directory: typeof saveRawTimeouts | typeof saveRawTimeouts
+) => {
+	clearTimeout(directory.main);
+	directory.sub.forEach((timeout) => {
+		clearTimeout(timeout);
+	});
+
+	directory.main = undefined;
+	directory.sub = [];
+};
+const setSaveTimeout = (
+	directory: typeof saveRawTimeouts | typeof saveRawTimeouts,
+	timeout: NodeJS.Timeout,
+	type: "main" | "sub" = "main"
+) => {
+	if (type === "main") {
+		directory.main = timeout;
+	} else {
+		directory.sub.push(timeout);
+	}
+};
+export const saveState = (
+	docObj: State,
+	before?: () => void,
+	after?: () => void
+) => {
+	const asd = false;
+	if (!docObj.snapshotId || asd) {
 		return;
 	}
 
@@ -140,34 +216,88 @@ export const saveState = (docObj: State) => {
 			obj.treeState.default = obj.treeState[id];
 			delete obj.treeState[id];
 		}
-		if (treeState.type !== "manual") {
-			treeState.stage.lines = {};
-			treeState.stage.indis = {};
-		}
+
 		delete treeState.raw;
 	});
 	const compressed = compress(obj) as State;
-	const objWithoutRaw = omit(compressed, "loading", "loadingTime");
-	const { userId } = objWithoutRaw;
+	const objWithoutRaw = omit(
+		compressed,
+		"logoutState",
+		"clouding",
+		"loading",
+		"loadingTime"
+	);
+	const { userId, snapshotId } = objWithoutRaw;
 
 	if (userId) {
-		setThrottledDoc(
-			doc(db, "state", userId),
-			{
-				...objWithoutRaw,
-				lastActionTime: Date.now(),
-			},
-			{}
+		clearSaveTimeouts(saveTimeouts);
+		setSaveTimeout(
+			saveTimeouts,
+			setTimeout(() => {
+				before?.();
+				if (userId) {
+					const chunks = chunkRaw(JSON.stringify(objWithoutRaw));
+
+					const lastActionTime = Date.now();
+					chunks?.forEach((chunk, index) => {
+						setSaveTimeout(
+							saveTimeouts,
+							setTimeout(() => {
+								const isLast = index >= chunks.length - 1;
+								setDoc(
+									doc(
+										db,
+										"state_chunks",
+										`${userId}_${index}`
+									),
+									{
+										index,
+										total: chunks.length,
+										chunk: addChunkMarker(
+											chunk,
+											chunks.length,
+											index,
+											lastActionTime
+										),
+										userId,
+										snapshotId,
+										lastActionTime,
+									}
+								).then(() => {
+									if (isLast) {
+										deleteStates(userId, undefined, [
+											where(
+												"lastActionTime",
+												"!=",
+												lastActionTime
+											),
+										]);
+										after?.();
+									}
+								});
+							}, 1000 * index),
+							"sub"
+						);
+					});
+				} else {
+					console.error("Id must be provided");
+				}
+			}, 3000)
 		);
-	} else {
-		console.error("Id must be provided");
 	}
 };
 
-export const deleteRawStates = (docObj: State, callback?: () => void) => {
-	const { userId } = docObj;
+export const deleteRawStates = (
+	userId?: string,
+	callback?: () => void,
+	constraints?: QueryConstraint[]
+) => {
 	if (userId) {
-		const q = query(collection(db, "raw"), where("userId", "==", userId));
+		const q = query(
+			collection(db, "raw"),
+			where("userId", "==", userId),
+			...(constraints ?? [])
+		);
 
 		const unsubscribe = onSnapshot(q, (snapshot) => {
 			Promise.all(
@@ -183,8 +313,13 @@ export const deleteRawStates = (docObj: State, callback?: () => void) => {
 	}
 };
 
-export const saveRawState = (docObj: State) => {
-	if (!docObj.rawSnapshotId) {
+export const saveRawState = (
+	docObj: State,
+	before?: () => void,
+	after?: () => void
+) => {
+	const asd = false;
+	if (!docObj.rawSnapshotId || asd) {
 		return;
 	}
 	const rawObj = pick(
@@ -194,32 +329,58 @@ export const saveRawState = (docObj: State) => {
 		"rawSnapshotId"
 	) as Pick<State, "treeState" | "userId" | "rawSnapshotId">;
 	const { userId } = rawObj;
-	deleteRawStates(docObj, () => {
-		if (userId) {
-			const newRaws: Record<string, string | undefined> = {};
-			Object.entries(rawObj.treeState).forEach(([id, treeState]) => {
-				if (!treeState.settings.cloudSync && id) {
-					return;
-				}
-				newRaws[id] = treeState.raw;
-			});
-			const raws = chunkRaw(JSON.stringify(newRaws));
+	clearSaveTimeouts(saveRawTimeouts);
 
-			raws?.forEach((raw, index) => {
-				setTimeout(() => {
-					setDoc(doc(db, "raw", `${userId}_${index}`), {
-						...omit(rawObj, "treeState"),
-						index,
-						total: raws.length,
-						raw,
-						lastActionTime: Date.now(),
-					});
-				}, 1000 * index);
-			});
-		} else {
-			console.error("Id must be provided");
-		}
-	});
+	setSaveTimeout(
+		saveRawTimeouts,
+		setTimeout(() => {
+			before?.();
+
+			if (userId) {
+				const newRaws: Record<string, string | undefined> = {};
+				Object.entries(rawObj.treeState).forEach(([id, treeState]) => {
+					if (!treeState.settings.cloudSync && id) {
+						return;
+					}
+					newRaws[id] = treeState.raw;
+				});
+				const raws = chunkRaw(JSON.stringify(newRaws));
+
+				const lastActionTime = Date.now();
+				raws?.forEach((raw, index) => {
+					setSaveTimeout(
+						saveRawTimeouts,
+						setTimeout(() => {
+							const isLast = index >= raws.length - 1;
+							setDoc(doc(db, "raw", `${userId}_${index}`), {
+								...omit(rawObj, "treeState"),
+								index,
+								total: raws.length,
+								raw: addChunkMarker(
+									raw,
+									raws.length,
+									index,
+									lastActionTime
+								),
+								lastActionTime,
+							}).then(() => {
+								if (isLast) {
+									deleteRawStates(userId, undefined, [
+										where(
+											"lastActionTime",
+											"!=",
+											lastActionTime
+										),
+									]);
+									after?.();
+								}
+							});
+						}, 1000 * index)
+					);
+				});
+			}
+		}, 1000)
+	);
 };
 
 export const deleteDebugState = (docObj: DebugState, callback?: () => void) => {
@@ -342,6 +503,33 @@ export const fetchApi = async (
 			redirect: "follow",
 			referrerPolicy: "no-referrer",
 			body: JSON.stringify(body),
+		}
+	);
+};
+
+export const saveStateWithClouding = (state: State) => {
+	saveState(
+		state,
+		() => {
+			dynamicStore().then((s) => {
+				s.dispatch?.(
+					actions.setClouding({
+						state: true,
+						fullscreen: false,
+					})
+				);
+			});
+		},
+		() => {
+			setTimeout(() => {
+				dynamicStore().then((s) => {
+					s.dispatch?.(
+						actions.setClouding({
+							state: false,
+						})
+					);
+				});
+			}, 3000);
 		}
 	);
 };

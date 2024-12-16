@@ -13,6 +13,7 @@ interface Props {
 	showLabel?: boolean;
 	className?: string;
 	transparent?: boolean;
+	horizontal?: boolean;
 }
 
 export const Loading = ({
@@ -24,6 +25,7 @@ export const Loading = ({
 	showLabel = true,
 	className = "",
 	transparent,
+	horizontal,
 }: Props) => {
 	const { t } = useTranslation();
 	const [loadingTime, setLoadingTime] = useState<number>();
@@ -83,6 +85,7 @@ export const Loading = ({
 				role="status"
 				inline={inline}
 				transparent={transparent}
+				horizontal={horizontal}
 			>
 				<svg
 					aria-hidden="true"

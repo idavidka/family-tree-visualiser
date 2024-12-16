@@ -34,6 +34,7 @@ import {
 	selectSelectedForKinship,
 	selectRaw,
 	selectPinned,
+	selectClouding,
 } from "../../store/main/selectors";
 import {
 	type TagNameType,
@@ -138,6 +139,7 @@ const Sidebar = ({
 	const items = useSelector(selectAllIndis);
 	const itemsOnStage = useSelector(selectIndiPositions);
 	const selected = useSelector(selectSelected);
+	const clouding = useSelector(selectClouding);
 	const pinnedIndis = useSelector(selectPinned);
 	const forKinship = useSelector(selectSelectedForKinship);
 	const searched = useSelector(selectSearched);
@@ -1417,6 +1419,16 @@ const Sidebar = ({
 				opened={sidebarOpen}
 			>
 				<Wrapper>
+					{clouding === "normal" ? (
+						<Loading
+							className="text-xs"
+							visible
+							horizontal
+							inline
+							text="Syncing with cloud"
+							transparent
+						/>
+					) : null}
 					<List>
 						<Header
 							settings={settings}

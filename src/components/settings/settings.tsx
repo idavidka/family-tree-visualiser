@@ -171,7 +171,7 @@ export const Settings = ({ settings, isAncestry, isMyHeritage }: Props) => {
 					{t("Export")}
 				</button>
 			</Label>
-			<Toggle
+			{/* <Toggle
 				label={t("Sync to cloud")}
 				checked={localSettings.cloudSync}
 				onChange={(e) => {
@@ -182,7 +182,7 @@ export const Settings = ({ settings, isAncestry, isMyHeritage }: Props) => {
 				}}
 				className="text-white"
 				required
-			/>
+			/> */}
 
 			{isAncestry && (
 				<Label className="text-white text-left text-xs mt-2">

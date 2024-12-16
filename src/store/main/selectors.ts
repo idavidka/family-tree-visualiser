@@ -43,6 +43,10 @@ export const selectLoading = createSelector(
 	selectMainState,
 	(state) => state.loading
 );
+export const selectClouding = createSelector(
+	selectMainState,
+	(state) => state.clouding
+);
 export const selectLoadingTime = createSelector(
 	selectMainState,
 	(state) => state.loadingTime
@@ -61,10 +65,13 @@ export const selectSelectedRaw = createSelector(
 );
 export const selectTreeState = createSelector(
 	[selectMainState, selectSelectedRaw],
-	(state, selected) =>
-		(selected && state.treeState[selected]) ||
-		state.treeState[""] ||
-		DEFAULT_TREE_STATE
+	(state, selected) => {
+		return (
+			(selected && state.treeState[selected]) ||
+			state.treeState[""] ||
+			DEFAULT_TREE_STATE
+		);
+	}
 );
 
 export const selectRawIds = createSelector(selectMainState, (state) => {
@@ -107,12 +114,12 @@ export const selectRawSnapshotId = createSelector(
 
 export const selectFanStage = createSelector(
 	selectTreeState,
-	(state) => state.fanStage
+	(state) => state.fanStage ?? {}
 );
 
 export const selectStage = createSelector(
 	selectTreeState,
-	(state) => state.stage
+	(state) => state.stage ?? {}
 );
 
 export const selectScale = createSelector(selectStage, (state) => state.scale);
@@ -230,13 +237,13 @@ export const selectEdgeIndi = createSelector(
 );
 
 export const selectSearchHistory = createSelector(selectTreeState, (state) =>
-	Object.keys(state.searchHistory).map((historyItem) =>
+	Object.keys(state.searchHistory ?? {}).map((historyItem) =>
 		parseSearchCache(historyItem)
 	)
 );
 export const selectStageHistory = createSelector(
 	selectTreeState,
-	(state) => state.stageHistory.items
+	(state) => state.stageHistory?.items
 );
 export const selectStageHistoryPointer = createSelector(
 	selectTreeState,

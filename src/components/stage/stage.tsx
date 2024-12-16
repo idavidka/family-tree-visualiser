@@ -120,7 +120,8 @@ import { nameFormatter } from "../../utils/name-formatter";
 import { art } from "../../utils/art";
 import { openInNewTab } from "../../utils/link";
 import useAppWorker from "../../hooks/use-app-worker";
-import { debounce } from "lodash";
+import { debounce, get } from "lodash";
+import { TextInput } from "../inputs/text-input.styled";
 
 const isDev = isDevelopment();
 
@@ -1167,6 +1168,7 @@ const Stage = ({
 				}
 
 				window.isRehydrating = false;
+				dispatch(actions.setClouding({ state: false }));
 			}, SAVE_DEBOUNCE_TIME);
 		},
 		[dispatch]
@@ -1185,6 +1187,7 @@ const Stage = ({
 				}
 
 				window.isRehydrating = false;
+				dispatch(actions.setClouding({ state: false }));
 			}, SAVE_DEBOUNCE_TIME);
 		},
 		[dispatch]
@@ -1533,6 +1536,52 @@ const Stage = ({
 		gedcom,
 	]);
 
+	const [zoomValue, setZoomValue] = useState("100%");
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	const formatZoomValue = useCallback((value: number | string) => {
+		setZoomValue(
+			new Intl.NumberFormat("en-US", {
+				useGrouping: false,
+				maximumFractionDigits: 2,
+				style: "percent",
+			}).format(Number(`${value}`.replace(/[^\d.]/, "") || 0))
+		);
+	}, []);
+
+	const onZoomValueChange = useCallback<React.ChangeEventHandler>(
+		(e) => {
+			const target = e.target as HTMLInputElement;
+			const newValue =
+				Number(`${target.value}`.replace(/[^\d.]/, "") || 0) / 100;
+			const diff = stage.scale - newValue;
+			const smooth = !!transRef?.current?.instance?.setup?.smooth;
+			const delta = 1;
+			const step = smooth
+				? Math.log(newValue / stage.scale) / delta
+				: (newValue - stage.scale) / delta;
+
+			formatZoomValue(newValue);
+			if (diff < 0) {
+				transRef?.current?.zoomIn(Math.abs(step));
+				transFanRef?.current?.zoomIn(Math.abs(step));
+			} else {
+				transRef?.current?.zoomOut(Math.abs(step));
+				transFanRef?.current?.zoomOut(Math.abs(step));
+			}
+		},
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[stage.scale, formatZoomValue]
+	);
+	const onZoom = useCallback(
+		(ref: ReactZoomPanPinchRef) => {
+			formatZoomValue(ref.state.scale);
+		},
+		[formatZoomValue]
+	);
+	useEffect(() => {
+		formatZoomValue(stage.scale);
+	}, [formatZoomValue, stage.scale]);
+
 	const debugStatesArray = useMemo(() => {
 		return Object.entries(debugStates ?? {});
 	}, [debugStates]);
@@ -1544,6 +1593,7 @@ const Stage = ({
 		if (["fanChart", "treeArt"].includes(treeMode)) {
 			return {
 				onPanningStop: onDragEndFan,
+				onZoom,
 				onTransformed: onTransformedFan,
 				initialPositionX: fanStage.x,
 				initialPositionY: fanStage.y,
@@ -1564,6 +1614,7 @@ const Stage = ({
 			onPanningStart: onDragStart,
 			onPanningStop: onDragEnd,
 			onTransformed,
+			onZoom,
 			panning: { excluded: ["avoid-stage-gesture"] },
 			doubleClick: {
 				excluded: ["avoid-stage-gesture"],
@@ -1591,6 +1642,7 @@ const Stage = ({
 		onDragStart,
 		onTransformed,
 		onTransformedFan,
+		onZoom,
 		stage.scale,
 		stage.x,
 		stage.y,
@@ -2160,6 +2212,12 @@ const Stage = ({
 					>
 						<BiMinus className="icon" />
 					</StageButton>
+					<TextInput
+						className="w-[50px] px-0.5 m-0 text-center text-xs border-none focus:w-[100px] focus:px-1 hover:w-[100px] hover:px-1 transition-all"
+						autoComplete="off"
+						value={zoomValue}
+						onChange={onZoomValueChange}
+					/>
 				</ButtonWrapper>
 				{validationDetails.length ? (
 					<ErrorComponent title={t("Invalid place")}>

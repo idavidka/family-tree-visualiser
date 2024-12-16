@@ -24,7 +24,7 @@ import {
 	deleteRawStates,
 	deleteStates,
 	saveRawState,
-	saveState,
+	saveStateWithClouding,
 } from "../../utils/firebase";
 import { value, subValue, defaultRaw } from "./utils";
 import { type Language } from "../../translation/i18n";
@@ -64,14 +64,19 @@ export const rehydrate: R<
 	Object.entries(action.payload.treeState ?? {}).forEach(
 		([key, treeState]) => {
 			const id = key === "default" ? "" : key;
-			if (!state.treeState[id]?.settings.cloudSync && id) {
-				return;
-			}
+			// if (!state.treeState[id]?.settings.cloudSync && id) {
+			// 	return;
+			// }
 
 			newState.treeState[id] = {
-				...treeState,
-				stage: state.treeState[id]?.stage,
-				raw: treeState.raw || state.treeState[id]?.raw,
+				...state.treeState[id],
+				...(!state.treeState[id]?.settings?.cloudSync &&
+				!treeState.settings?.cloudSync &&
+				id
+					? {}
+					: treeState),
+				// stage: state.treeState[id]?.stage,
+				// raw: state.treeState[id]?.raw,
 			};
 			// if (treeState.type !== "manual") {
 			// 	state.treeState[id].stage = {
@@ -106,7 +111,7 @@ export const rehydrateRaw: R<
 	Object.entries(action.payload.treeState ?? {}).forEach(
 		([key, treeState]) => {
 			const id = key === "default" ? "" : key;
-			if (!state.treeState[id]?.settings.cloudSync && id) {
+			if (!state.treeState[id]?.settings?.cloudSync && id) {
 				return;
 			}
 
@@ -132,38 +137,52 @@ export const importTreeStates: R<string> = (state, action) => {
 
 	state.treeState = { ...state.treeState, ...newTreeState };
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const removeStates: RN = (state) => {
-	deleteStates(state);
-	deleteRawStates(state);
+	deleteStates(state.userId);
+	deleteRawStates(state.userId);
 };
 
 export const restoreStates: RN = (state) => {
-	saveState(state);
+	saveStateWithClouding(state);
 	saveRawState(state);
 };
 
 export const setUserId: R<string | undefined> = (state, action) => {
-	state.userId = action.payload;
+	const newState: State = {
+		...initialState,
+		...(action.payload ? state.logoutState?.[action.payload] : {}),
+		userId: action.payload,
+	};
+	// state.userId = action.payload;
 
-	saveState(state);
+	saveStateWithClouding(newState);
+
+	return newState;
 };
 
-export const logout: RN = (_state) => {
-	return initialState;
+export const logout: RN = (state) => {
+	const newState: State = {
+		...initialState,
+		logoutState: {
+			...state.logoutState,
+			...(state.userId ? { [state.userId]: state } : {}),
+		},
+	};
+	return newState;
 };
 
 export const setLanguage: R<Language> = (state, action) => {
 	state.lang = action.payload;
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 export const setGuidded: R<boolean> = (state, action) => {
 	state.guided = action.payload;
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const resetSettings: RN = (state) => {
@@ -172,18 +191,18 @@ export const resetSettings: RN = (state) => {
 		cloudSync: subValue(state, "settings", "cloudSync"),
 	});
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setSettings: R<Partial<Settings>> = (state, action) => {
-	const currentCloudSync = value(state, "settings").cloudSync;
+	const currentCloudSync = value(state, "settings")?.cloudSync;
 	value(state, "settings", {
 		...DEFAULT_TREE_STATE.settings,
 		...value(state, "settings"),
 		...action.payload,
 	});
 
-	saveState(state);
+	saveStateWithClouding(state);
 
 	if (currentCloudSync !== action.payload.cloudSync) {
 		saveRawState(state);
@@ -207,7 +226,7 @@ export const setAdditionalSettings: R<{
 	settings.additional[action.payload.type][action.payload.name] =
 		action.payload.value;
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setMode: R<Exclude<State["mode"], undefined>> = (
@@ -216,25 +235,25 @@ export const setMode: R<Exclude<State["mode"], undefined>> = (
 ) => {
 	state.mode = action.payload;
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setTreeMode: R<Exclude<TreeType, undefined>> = (state, action) => {
 	value(state, "treeMode", action.payload);
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setSidebarOpen: R<boolean> = (state, action) => {
 	state.sidebarOpen = action.payload;
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const toggleSidebarOpen: RN = (state) => {
 	state.sidebarOpen = !state.sidebarOpen;
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setStage: R<Stage> = (state, action) => {
@@ -257,7 +276,7 @@ export const setStage: R<Stage> = (state, action) => {
 		},
 	});
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setFanStage: R<Stage> = (state, action) => {
@@ -267,7 +286,7 @@ export const setFanStage: R<Stage> = (state, action) => {
 		...stage,
 	});
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const clearStage: RN = (state) => {
@@ -276,7 +295,7 @@ export const clearStage: RN = (state) => {
 
 	setLines(state, { type: "main/setLines", payload: { reposition: false } });
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const resetStage: RN = (state) => {
@@ -287,7 +306,7 @@ export const resetStage: RN = (state) => {
 		scale: DEFAULT_TREE_STATE.stage.scale,
 	});
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setIndi: R<{ id: IndiKey; record: StageIndi }> = (
@@ -299,14 +318,14 @@ export const setIndi: R<{ id: IndiKey; record: StageIndi }> = (
 		[action.payload.id]: action.payload.record,
 	});
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const addRaw: R<{ id: string; raw: string }> = (state, action) => {
 	if (state.selectedRaw) {
 		state.treeState[state.selectedRaw].raw = action.payload.raw;
 	} else {
-		state.treeState[action.payload.id] = defaultRaw(state);
+		state.treeState[action.payload.id] = { ...defaultRaw(state) };
 		state.treeState[action.payload.id].raw = action.payload.raw;
 		state.selectedRaw = action.payload.id;
 	}
@@ -317,7 +336,7 @@ export const addRaw: R<{ id: string; raw: string }> = (state, action) => {
 		resetGedcomCache(state.selectedRaw, GedcomTree.parse(addedRaw));
 
 	saveRawState(state);
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const renameRaw: R<{ id: string; newId: string }> = (state, action) => {
@@ -329,7 +348,7 @@ export const renameRaw: R<{ id: string; newId: string }> = (state, action) => {
 	state.selectedRaw = action.payload.newId;
 
 	saveRawState(state);
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const deleteRaw: R<string> = (state, action) => {
@@ -340,13 +359,13 @@ export const deleteRaw: R<string> = (state, action) => {
 	}
 
 	saveRawState(state);
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setSelectedRaw: R<string | undefined> = (state, action) => {
 	state.selectedRaw = action.payload || "";
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setSelected: R<IndiKey | undefined> = (state, action) => {
@@ -356,7 +375,7 @@ export const setSelected: R<IndiKey | undefined> = (state, action) => {
 		value(state, "treeMode", "tree");
 	}
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setSelectedForKinship: R<IndiKey | undefined> = (
@@ -365,7 +384,7 @@ export const setSelectedForKinship: R<IndiKey | undefined> = (
 ) => {
 	value(state, "selectedForKinship", action.payload);
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setStagePositionTo: R<{
@@ -411,7 +430,7 @@ export const setSearched: R<TagInputData[]> = (state, action) => {
 		payload: value(state, "searched"),
 	});
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setPinned: R<{ id: IndiKey; type: "add" | "remove" }> = (
@@ -425,7 +444,7 @@ export const setPinned: R<{ id: IndiKey; type: "add" | "remove" }> = (
 			: current.filter((c) => c !== action.payload.id);
 	value(state, "pinned", newPinned.join(","));
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setOpened: R<{
@@ -442,7 +461,7 @@ export const setOpened: R<{
 	}
 	opened[id][key] = payloadState;
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setScrolled: R<{ id: string; index: number; scroll: number }> = (
@@ -462,7 +481,7 @@ export const setScrolled: R<{ id: string; index: number; scroll: number }> = (
 	}
 	scrolled[id][index] = scroll;
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setLines: R<{ reposition?: boolean }> = (state, action) => {
@@ -491,7 +510,7 @@ export const setLines: R<{ reposition?: boolean }> = (state, action) => {
 
 	stage.lines = lines;
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setIndiOnStage: R<{ id: IndiKey } & IndiDimensions> = (
@@ -521,7 +540,7 @@ export const setIndiOnStage: R<{ id: IndiKey } & IndiDimensions> = (
 		},
 	});
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 export const setLoading: R<{ state: boolean; text?: string; time?: number }> = (
@@ -533,6 +552,17 @@ export const setLoading: R<{ state: boolean; text?: string; time?: number }> = (
 	state.loadingText = action.payload.text;
 };
 
+export const setClouding: R<{ state: boolean; fullscreen?: boolean }> = (
+	state,
+	action
+) => {
+	state.clouding = !action.payload.state
+		? undefined
+		: action.payload.fullscreen
+		? "fullscreen"
+		: "normal";
+};
+
 export const setTreeRaw: R<{
 	indis?: Stage["indis"];
 	lines?: Stage["lines"];
@@ -540,6 +570,8 @@ export const setTreeRaw: R<{
 	value(state, "stage").indis = action.payload.indis;
 	value(state, "stage").lines = action.payload.lines;
 	value(state, "type", "tree");
+
+	saveStateWithClouding(state);
 };
 
 export const setTree: R<IndiKey> = (state, action) => {
@@ -564,6 +596,8 @@ export const setGenealogyRaw: R<{
 	value(state, "stage").indis = action.payload.indis;
 	value(state, "stage").lines = action.payload.lines;
 	value(state, "type", "genealogy");
+
+	saveStateWithClouding(state);
 };
 
 export const setGenealogy: R<IndiKey> = (state, action) => {
@@ -606,7 +640,7 @@ export const removeIndiFromStage: R<IndiKey> = (state, action) => {
 		});
 	}
 
-	saveState(state);
+	saveStateWithClouding(state);
 };
 
 const maxHistoryItems = 100;
@@ -661,5 +695,5 @@ export const setStageHistoryPointer: R<"undo" | "redo"> = (state, action) => {
 
 	stageHistory.pointer = newPointer;
 
-	saveState(state);
+	saveStateWithClouding(state);
 };

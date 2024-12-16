@@ -161,6 +161,7 @@ export interface TreeState {
 
 export interface State {
 	sidebarOpen: boolean;
+	clouding?: "normal" | "fullscreen";
 	loading?: boolean;
 	loadingTime?: number;
 	loadingText?: string;
@@ -172,6 +173,7 @@ export interface State {
 	lang: Language;
 	mode: Theme;
 	treeState: Record<string, TreeState>;
+	logoutState?: Record<string, State>;
 }
 
 export const initialOpenedState: BaseOpenedPanels = { 0: true };
@@ -244,6 +246,7 @@ export const initialState: State = {
 	mode: "dark",
 	treeState: {},
 	selectedRaw: "",
+	logoutState: {},
 };
 
 export const mainSlice = createSlice({
